@@ -5,20 +5,34 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>All Cameras - Grid View</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin:0; padding:12px; background:#f5f6f8; color:#111 }
-    h1 { font-size:18px; margin:0 0 12px }
-    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:10px }
-    .cell { background:#000; border-radius:8px; overflow:hidden; position:relative; min-height:160px }
-    .cell video { width:100%; height:100%; display:block; object-fit:cover }
-    .cell .label { position:absolute; left:8px; top:8px; background:rgba(0,0,0,0.6); color:#fff; padding:6px 8px; border-radius:6px; font-size:13px }
-    .cell .id { position:absolute; right:8px; top:8px; background:rgba(0,0,0,0.4); color:#fff; padding:4px 6px; border-radius:6px; font-size:12px }
-    .controls { margin-top:10px }
-    .note { font-size:12px; color:#555; margin-top:8px }
+    /* Fill viewport with the grid; minimal chrome */
+    html,body { height:100%; }
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; margin:0; padding:0; background:#000; color:#fff; display:flex; flex-direction:column }
+    header { padding:8px 12px; background:transparent; z-index:1000; }
+    h1 { font-size:16px; margin:0; color:#fff }
+  /* Force a 4x3 layout: 4 columns, 3 rows. Cells use a 16:9 landscape aspect ratio so videos look natural. */
+  #grid { flex:1 1 auto; display:grid; grid-template-columns: repeat(4, 1fr); gap:6px; align-content:stretch; padding:6px; box-sizing:border-box }
+  .cell { background:#000; border-radius:6px; overflow:hidden; position:relative; min-height:0; display:block }
+  /* Use an inner aspect-box to preserve a 16:9 (width:height) ratio for landscape */
+  .cell::before { content:''; display:block; padding-top: calc(9 / 16 * 100%); /* height = width * 9/16 */ }
+  /* Only the video and status overlay should fill the cell; labels and index badges should size to content */
+  .cell > video, .cell > .status { position:absolute; left:0; top:0; right:0; bottom:0 }
+  .cell video { width:100%; height:100%; display:block; object-fit:cover }
+    .cell .label { position:absolute; left:8px; top:8px; right:auto; bottom:auto; background:rgba(0,0,0,0.55); color:#fff; padding:4px 6px; border-radius:6px; font-size:12px; line-height:1; max-width:70%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+    .cell .index { position:absolute; right:8px; top:8px; background:rgba(0,0,0,0.35); color:#fff; padding:3px 6px; border-radius:6px; font-size:12px }
+    .note { font-size:12px; color:#ccc; padding:6px 12px; text-align:center }
+    /* Make each grid cell maintain aspect roughly and fill rows evenly */
+  /* On smaller screens, step down columns to keep cells usable */
+  @media (max-width:1100px) { #grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width:800px) { #grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width:420px) { #grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
-  <h1>All Cameras Grid</h1>
-  <div id="grid" class="grid"></div>
+  <header>
+    <h1>All Cameras Grid</h1>
+  </header>
+  <div id="grid"></div>
   <div class="note">Autoplay is muted. Click a cell to toggle play/pause. Streams use hls.js when available.</div>
   <script src="./all-cameras.js"></script>
 </body>

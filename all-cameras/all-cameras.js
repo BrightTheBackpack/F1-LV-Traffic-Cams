@@ -2,8 +2,8 @@
   // Ordered camera IDs copied from main app
   var orderedCameraIds = [3429,3498,3416,3415,3414,3413,3882,3909,3410,3412,3411,4036];
 
-  // NV Roads default endpoint (same as used in main app)
-  var nvDefault = 'https://www.nvroads.com/List/GetData/Cameras?query=%7B%22columns%22%3A%5B%7B%22data%22%3Anull%2C%22name%22%3A%22%22%7D%2C%7B%22name%22%3A%22sortOrder%22%2C%22s%22%3Atrue%7D%2C%7B%22name%22%3A%22region%22%2C%22s%22%3Atrue%7D%2C%7B%22name%22%3A%22roadway%22%2C%22s%22%3Atrue%7D%2C%7B%22data%22%3A4%2C%22name%22%3A%22%22%7D%5D%2C%22order%22%3A%5B%7B%22column%22%3A1%2C%22dir%22%3A%22asc%22%7D%2C%7B%22column%22%3A2%2C%22dir%22%3A%22asc%22%7D%2C%7B%22column%22%3A3%2C%22dir%22%3A%22asc%22%7D%5D%2C%22start%22%3A0%2C%22length%22%3A17%2C%22search%22%3A%7B%22value%22%3A%22f1%22%7D%7D&lang=en-US';
+  // NV Roads endpoint proxied through the provided workers.dev proxy to bypass CORS
+  var nvDefault = 'https://wispy-flower-cdf3.100brightli.workers.dev/?url=https://www.nvroads.com/List/GetData/Cameras?query=%7B%22columns%22%3A%5B%7B%22data%22%3Anull%2C%22name%22%3A%22%22%7D%2C%7B%22name%22%3A%22sortOrder%22%2C%22s%22%3Atrue%7D%2C%7B%22name%22%3A%22region%22%2C%22s%22%3Atrue%7D%2C%7B%22name%22%3A%22roadway%22%2C%22s%22%3Atrue%7D%2C%7B%22data%22%3A4%2C%22name%22%3A%22%22%7D%5D%2C%22order%22%3A%5B%7B%22column%22%3A1%2C%22dir%22%3A%22asc%22%7D%2C%7B%22column%22%3A2%2C%22dir%22%3A%22asc%22%7D%2C%7B%22column%22%3A3%2C%22dir%22%3A%22asc%22%7D%5D%2C%22start%22%3A0%2C%22length%22%3A17%2C%22search%22%3A%7B%22value%22%3A%22f1%22%7D%7D&lang=en-US';
 
   var grid = document.getElementById('grid');
 
@@ -20,7 +20,7 @@
   }
 
   // Helper to create a cell for a camera
-  function makeCell(cam) {
+  function makeCell(cam, idx) {
     var cell = document.createElement('div');
     cell.className = 'cell';
 
@@ -29,11 +29,39 @@
     v.style.background = '#000';
     cell.appendChild(v);
 
-    var label = document.createElement('div'); label.className = 'label';
-    label.textContent = cam.title || ('Camera ' + cam.id);
-    cell.appendChild(label);
+  // status overlay to show why a cell may be empty / loading / errored
+  var status = document.createElement('div');
+  status.style.position = 'absolute';
+  status.style.left = '50%';
+  status.style.top = '50%';
+  status.style.transform = 'translate(-50%, -50%)';
+  status.style.background = 'rgba(0,0,0,0.6)';
+  status.style.color = '#fff';
+  status.style.padding = '8px 10px';
+  status.style.borderRadius = '6px';
+  status.style.fontSize = '13px';
+  status.style.zIndex = 10;
+  status.textContent = '';
+  // start hidden; use setStatus() to show/hide
+  status.style.display = 'none';
+  function setStatus(txt) {
+    try {
+      if (!txt) {
+        status.textContent = '';
+        status.style.display = 'none';
+      } else {
+        status.textContent = txt;
+        status.style.display = 'block';
+      }
+    } catch (e) {}
+  }
+  cell.appendChild(status);
 
-    var idEl = document.createElement('div'); idEl.className = 'id'; idEl.textContent = cam.id; cell.appendChild(idEl);
+  var label = document.createElement('div'); label.className = 'label';
+  label.textContent = cam.title || ('Camera ' + cam.id);
+  cell.appendChild(label);
+
+  var idxEl = document.createElement('div'); idxEl.className = 'index'; idxEl.textContent = (typeof idx === 'number' ? (idx + 1) : '') ; cell.appendChild(idxEl);
 
     cell.addEventListener('click', function () {
       try {
@@ -41,28 +69,115 @@
       } catch(e){}
     });
 
-    // attach player (Hls or native)
+    // attach player (Hls or native), but first probe the URL to surface network activity/CORS
     (function (videoEl, camObj) {
       var url = camObj.videoUrl;
-      if (!url) return; // no stream
-      ensureHls().then(function (Hls) {
+      if (!url) {
+        status.textContent = 'No stream URL';
+        return; // no stream
+      }
+
+  setStatus('Checking…');
+      // Probe the manifest with a fetch so the Network tab shows attempted requests (and CORS errors)
+      // Use a short timeout via Promise.race in case the request hangs.
+      var probe = function (u, timeoutMs) {
+        return new Promise(function (resolve) {
+          var done = false;
+          var timer = setTimeout(function () { if (!done) { done = true; resolve({ ok: false, reason: 'timeout' }); } }, timeoutMs || 6000);
+          fetch(u, { method: 'GET', mode: 'cors', cache: 'no-store' }).then(function (r) {
+            if (done) return;
+            done = true; clearTimeout(timer);
+            resolve({ ok: !!(r && r.ok), status: r && r.status });
+          }).catch(function (err) {
+            if (done) return;
+            done = true; clearTimeout(timer);
+            resolve({ ok: false, reason: (err && err.message) || String(err) });
+          });
+        });
+      };
+
+      probe(url, 5000).then(function (res) {
         try {
-          if (Hls && Hls.isSupported() && String(url).indexOf('.m3u8') !== -1) {
-            var h = new Hls({ enableWorker:true });
-            h.loadSource(url);
-            h.attachMedia(videoEl);
-            videoEl.play().catch(function(){});
-            // store h on element to cleanup later
-            videoEl._hls = h;
+          if (res && res.ok) {
+            setStatus('Loading stream…');
+          } else if (res && res.status) {
+            setStatus('HTTP ' + res.status);
+          } else if (res && res.reason) {
+            setStatus('Probe error');
+            console.warn('Probe error for', url, res.reason);
           } else {
-            videoEl.src = url;
-            videoEl.play().catch(function(){});
+            setStatus('No response');
           }
-        } catch (e) {
-          try { videoEl.src = url; videoEl.play().catch(function(){}); } catch (er) {}
-        }
-      }).catch(function () {
-        try { videoEl.src = url; videoEl.play().catch(function(){}); } catch (e) {}
+        } catch (e) {}
+
+        // attempt to attach player regardless (so Hls will attempt manifest fetch too)
+        ensureHls().then(function (Hls) {
+          try {
+            if (Hls && Hls.isSupported() && String(url).indexOf('.m3u8') !== -1) {
+                var h = new Hls({ enableWorker:true });
+                  h.on && h.on(Hls.Events.MANIFEST_PARSED, function () { try { setStatus(''); } catch (e) {} });
+                  h.on && h.on(Hls.Events.ERROR, function (ev, data) {
+                    try {
+                      // Only show a stream error for fatal errors, otherwise log and ignore
+                      if (data && data.fatal) {
+                        setStatus('Stream error');
+                      }
+                      console.warn('HLS error', data);
+                    } catch (e) {}
+                  });
+                h.loadSource(url);
+                h.attachMedia(videoEl);
+                videoEl.play().catch(function(){});
+                // store h on element to cleanup later
+                videoEl._hls = h;
+
+                // Live-sync: if player is behind live edge by >1.5s, jump to live.
+                // Use Hls.liveSyncPosition when available, otherwise estimate from buffered end.
+                var liveCheck = function () {
+                  try {
+                    var livePos = (h && h.liveSyncPosition) || null;
+                    // fallback: try to compute buffered end - some streams expose target duration
+                    if (livePos == null && videoEl.buffered && videoEl.buffered.length) {
+                      livePos = videoEl.buffered.end(videoEl.buffered.length - 1);
+                    }
+                    if (!livePos || !isFinite(livePos)) return;
+                    var cur = videoEl.currentTime || 0;
+                    var lag = livePos - cur;
+                    if (lag > 1.5) {
+                      // jump to the live position (slightly behind to avoid rebuffer)
+                      var target = Math.max(0, livePos - 0.5);
+                      try { videoEl.currentTime = target; } catch (e) { try { videoEl.seek && videoEl.seek(target); } catch (er) {} }
+                    }
+                  } catch (e) {}
+                };
+                // run once per second while element is in DOM
+                videoEl._liveInterval = setInterval(liveCheck, 1000);
+
+                // cleanup on video error or when the element is removed
+                var cleanup = function () {
+                  try { if (videoEl._liveInterval) { clearInterval(videoEl._liveInterval); videoEl._liveInterval = null; } } catch (e) {}
+                  try { if (videoEl._hls) { videoEl._hls.destroy && videoEl._hls.destroy(); videoEl._hls = null; } } catch (e) {}
+                };
+                videoEl.addEventListener('error', cleanup);
+
+                // observe removal from DOM to cleanup resources
+                var mo = new MutationObserver(function () {
+                  if (!document.body.contains(videoEl)) {
+                    cleanup();
+                    try { mo.disconnect(); } catch (e) {}
+                  }
+                });
+                mo.observe(document.body, { childList:true, subtree:true });
+              } else {
+                videoEl.src = url;
+                videoEl.addEventListener('loadeddata', function () { try { setStatus(''); } catch (e) {} });
+                videoEl.addEventListener('error', function () { try { setStatus('Playback error'); } catch (e) {} });
+                videoEl.play().catch(function(){});
+              }
+          } catch (e) {
+            try { videoEl.src = url; videoEl.play().catch(function(){}); } catch (er) { status.textContent = 'Error'; }
+          }
+        }).catch(function () { try { videoEl.src = url; videoEl.play().catch(function(){}); } catch (e) { status.textContent = 'Error'; } });
       });
     })(v, cam);
 
@@ -107,7 +222,7 @@
     }
 
     // Build the grid — use orderedCameraIds array and create placeholder cells for missing items
-    orderedCameraIds.forEach(function (id) {
+    orderedCameraIds.forEach(function (id, i) {
       var item = byId[id] || { id: id, title: 'Camera ' + id, videoUrl: null };
       // try to extract video URL field from common payload shapes
       if (!item.videoUrl) {
@@ -116,7 +231,7 @@
           else if (item.videoUrl) item.videoUrl = item.videoUrl;
         } catch (e) {}
       }
-      var c = makeCell({ id: id, title: item.location || item.roadway || item.title || ('Camera ' + id), videoUrl: item.videoUrl });
+      var c = makeCell({ id: id, title: item.location || item.roadway || item.title || ('Camera ' + id), videoUrl: item.videoUrl }, i);
       grid.appendChild(c);
     });
 
