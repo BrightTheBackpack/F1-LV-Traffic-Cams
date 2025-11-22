@@ -16,6 +16,9 @@
         crossorigin=""
     />
 
+    <!-- Favicon -->
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+
     <!-- Leaflet JS (linked here so developers can use it from main.js) -->
     <script
         src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -73,7 +76,7 @@
         /* All Cameras quick link button */
         #all-cameras-btn {
             position: absolute;
-            right: 24px;
+            right: 50px;
             top: 12px;
             z-index: 1000005;
             background: rgba(0,0,0,0.7);
@@ -89,6 +92,25 @@
             gap: 8px;
         }
         #all-cameras-btn svg { width:14px; height:14px; display:block }
+        /* Disclaimer footer */
+        #disclaimer {
+            position: absolute;
+            left: 12px;
+            right: 12px;
+            bottom: 12px;
+            z-index: 1000010;
+            max-width: 720px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.88);
+            color: #222;
+            font-size: 12px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+            line-height: 1.2;
+        }
+        #disclaimer a { color: inherit; text-decoration: underline }
     </style>
 </head>
 <body>
@@ -152,6 +174,11 @@
             mapEl.dataset.tileAttribution = "Esri World Imagery";
         })();
     </script>
+
+        <!-- Unofficial site disclaimer -->
+        <div id="disclaimer" role="note" aria-live="polite">
+            This site is an unofficial fan project and is not affiliated with, endorsed by, or sponsored by Formula 1 or any official motorsport organisation. For official information visit <a href="https://www.formula1.com/" target="_blank" rel="noopener">formula1.com</a>.
+        </div>
 
 </body>
 </html>
