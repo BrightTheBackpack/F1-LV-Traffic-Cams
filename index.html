@@ -70,6 +70,25 @@
             border-radius: 6px;
             font-size: 13px;
         }
+        /* All Cameras quick link button */
+        #all-cameras-btn {
+            position: absolute;
+            right: 24px;
+            top: 12px;
+            z-index: 1000005;
+            background: rgba(0,0,0,0.7);
+            color: #fff;
+            border: 0;
+            padding: 8px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #all-cameras-btn svg { width:14px; height:14px; display:block }
     </style>
 </head>
 <body>
@@ -82,6 +101,12 @@
     <div id="map" role="region" aria-label="Las Vegas Grand Prix map (satellite view)" data-camera-endpoint="https://wispy-flower-cdf3.100brightli.workers.dev/?url=https://www.nvroads.com/List/GetData/Cameras?query=%7B%22columns%22%3A%5B%7B%22data%22%3Anull%2C%22name%22%3A%22%22%7D%2C%7B%22name%22%3A%22sortOrder%22%2C%22s%22%3Atrue%7D%2C%7B%22name%22%3A%22region%22%2C%22s%22%3Atrue%7D%2C%7B%22name%22%3A%22roadway%22%2C%22s%22%3Atrue%7D%2C%7B%22data%22%3A4%2C%22name%22%3A%22%22%7D%5D%2C%22order%22%3A%5B%7B%22column%22%3A1%2C%22dir%22%3A%22asc%22%7D%2C%7B%22column%22%3A2%2C%22dir%22%3A%22asc%22%7D%2C%7B%22column%22%3A3%2C%22dir%22%3A%22asc%22%7D%5D%2C%22start%22%3A0%2C%22length%22%3A17%2C%22search%22%3A%7B%22value%22%3A%22f1%22%7D%7D&lang=en-US">
         <!-- Leaflet will inject tiles and layers here in main.js -->
     </div>
+
+        <!-- Quick link to the all-cameras grid -->
+        <a id="all-cameras-btn" href="/all-cameras/index.html" target="_blank" rel="noopener"> 
+            <!-- <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5h18v14H3zM5 7v10h14V7H5z"></path></svg> -->
+            All Cameras
+        </a>
 
     <!-- Overlay / popup for current standings (main.js should populate this by fetching https://api.openf1.org/v1/position?session_key=latest) -->
     <!-- <aside id="standings" role="complementary" aria-live="polite">

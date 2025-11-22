@@ -24,10 +24,15 @@
     var cell = document.createElement('div');
     cell.className = 'cell';
 
-    var v = document.createElement('video');
-    v.muted = true; v.playsInline = true; v.autoplay = true; v.controls = false;
+  var v = document.createElement('video');
+  v.muted = true; v.playsInline = true; v.autoplay = true; v.controls = false;
     v.style.background = '#000';
     cell.appendChild(v);
+
+  // clear status when video actually starts playing or can play
+  v.addEventListener('playing', function () { try { setStatus(''); } catch (e) {} });
+  v.addEventListener('canplay', function () { try { setStatus(''); } catch (e) {} });
+  v.addEventListener('loadeddata', function () { try { setStatus(''); } catch (e) {} });
 
   // status overlay to show why a cell may be empty / loading / errored
   var status = document.createElement('div');
@@ -47,10 +52,10 @@
   function setStatus(txt) {
     try {
       if (!txt) {
-        status.textContent = '';
+  status.textContent = '';
         status.style.display = 'none';
       } else {
-        status.textContent = txt;
+  status.textContent = txt;
         status.style.display = 'block';
       }
     } catch (e) {}
@@ -73,7 +78,7 @@
     (function (videoEl, camObj) {
       var url = camObj.videoUrl;
       if (!url) {
-        status.textContent = 'No stream URL';
+        setStatus('No stream URL');
         return; // no stream
       }
 
@@ -108,8 +113,9 @@
           } else {
             setStatus('No response');
           }
-        } catch (e) {}
-
+          } catch (e) {
+            try { videoEl.src = url; videoEl.play().catch(function(){}); } catch (er) { setStatus('Error'); }
+          }
         // attempt to attach player regardless (so Hls will attempt manifest fetch too)
         ensureHls().then(function (Hls) {
           try {
@@ -118,13 +124,30 @@
                   h.on && h.on(Hls.Events.MANIFEST_PARSED, function () { try { setStatus(''); } catch (e) {} });
                   h.on && h.on(Hls.Events.ERROR, function (ev, data) {
                     try {
-                      // Only show a stream error for fatal errors, otherwise log and ignore
-                      if (data && data.fatal) {
-                        setStatus('Stream error');
-                      }
                       console.warn('HLS error', data);
+                      // Only react to fatal errors; debounce showing the UI in case recovery succeeds
+                      if (data && data.fatal) {
+                        // clear previous timer if any
+                        try { if (videoEl._errorTimer) { clearTimeout(videoEl._errorTimer); videoEl._errorTimer = null; } } catch (e) {}
+                        // attempt automatic recovery for common errors
+                        try {
+                          if (data.type === 'mediaError' && typeof h.recoverMediaError === 'function') {
+                            h.recoverMediaError();
+                          } else if (data.type === 'networkError') {
+                            // try to reload fragments
+                            h.startLoad && h.startLoad();
+                          }
+                        } catch (e) {}
+                        // show status only if error persists after 2s
+                        videoEl._errorTimer = setTimeout(function () {
+                          try { setStatus('Stream error'); } catch (e) {}
+                          videoEl._errorTimer = null;
+                        }, 2000);
+                      }
                     } catch (e) {}
                   });
+                  // When fragments buffer, clear any pending error indicator
+                  h.on && h.on(Hls.Events.FRAG_BUFFERED, function () { try { if (videoEl._errorTimer) { clearTimeout(videoEl._errorTimer); videoEl._errorTimer = null; } setStatus(''); } catch (e) {} });
                 h.loadSource(url);
                 h.attachMedia(videoEl);
                 videoEl.play().catch(function(){});
@@ -175,9 +198,9 @@
                 videoEl.play().catch(function(){});
               }
           } catch (e) {
-            try { videoEl.src = url; videoEl.play().catch(function(){}); } catch (er) { status.textContent = 'Error'; }
+            try { videoEl.src = url; videoEl.play().catch(function(){}); } catch (er) { setStatus('Error'); }
           }
-        }).catch(function () { try { videoEl.src = url; videoEl.play().catch(function(){}); } catch (e) { status.textContent = 'Error'; } });
+  }).catch(function () { try { videoEl.src = url; videoEl.play().catch(function(){}); } catch (e) { setStatus('Error'); } });
       });
     })(v, cam);
 
