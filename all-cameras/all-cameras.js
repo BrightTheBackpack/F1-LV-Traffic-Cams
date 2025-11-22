@@ -1,0 +1,128 @@
+(function () {
+  // Ordered camera IDs copied from main app
+  var orderedCameraIds = [3429,3498,3416,3415,3414,3413,3882,3909,3410,3412,3411,4036];
+
+  // NV Roads default endpoint (same as used in main app)
+  var nvDefault = 'https://www.nvroads.com/List/GetData/Cameras?query=%7B%22columns%22%3A%5B%7B%22data%22%3Anull%2C%22name%22%3A%22%22%7D%2C%7B%22name%22%3A%22sortOrder%22%2C%22s%22%3Atrue%7D%2C%7B%22name%22%3A%22region%22%2C%22s%22%3Atrue%7D%2C%7B%22name%22%3A%22roadway%22%2C%22s%22%3Atrue%7D%2C%7B%22data%22%3A4%2C%22name%22%3A%22%22%7D%5D%2C%22order%22%3A%5B%7B%22column%22%3A1%2C%22dir%22%3A%22asc%22%7D%2C%7B%22column%22%3A2%2C%22dir%22%3A%22asc%22%7D%2C%7B%22column%22%3A3%2C%22dir%22%3A%22asc%22%7D%5D%2C%22start%22%3A0%2C%22length%22%3A17%2C%22search%22%3A%7B%22value%22%3A%22f1%22%7D%7D&lang=en-US';
+
+  var grid = document.getElementById('grid');
+
+  function ensureHls() {
+    return new Promise(function (resolve) {
+      if (window.Hls) return resolve(window.Hls);
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.4.2/dist/hls.min.js';
+      s.async = true;
+      s.onload = function () { resolve(window.Hls); };
+      s.onerror = function () { resolve(null); };
+      document.head.appendChild(s);
+    });
+  }
+
+  // Helper to create a cell for a camera
+  function makeCell(cam) {
+    var cell = document.createElement('div');
+    cell.className = 'cell';
+
+    var v = document.createElement('video');
+    v.muted = true; v.playsInline = true; v.autoplay = true; v.controls = false;
+    v.style.background = '#000';
+    cell.appendChild(v);
+
+    var label = document.createElement('div'); label.className = 'label';
+    label.textContent = cam.title || ('Camera ' + cam.id);
+    cell.appendChild(label);
+
+    var idEl = document.createElement('div'); idEl.className = 'id'; idEl.textContent = cam.id; cell.appendChild(idEl);
+
+    cell.addEventListener('click', function () {
+      try {
+        if (v.paused) v.play().catch(function(){}); else v.pause();
+      } catch(e){}
+    });
+
+    // attach player (Hls or native)
+    (function (videoEl, camObj) {
+      var url = camObj.videoUrl;
+      if (!url) return; // no stream
+      ensureHls().then(function (Hls) {
+        try {
+          if (Hls && Hls.isSupported() && String(url).indexOf('.m3u8') !== -1) {
+            var h = new Hls({ enableWorker:true });
+            h.loadSource(url);
+            h.attachMedia(videoEl);
+            videoEl.play().catch(function(){});
+            // store h on element to cleanup later
+            videoEl._hls = h;
+          } else {
+            videoEl.src = url;
+            videoEl.play().catch(function(){});
+          }
+        } catch (e) {
+          try { videoEl.src = url; videoEl.play().catch(function(){}); } catch (er) {}
+        }
+      }).catch(function () {
+        try { videoEl.src = url; videoEl.play().catch(function(){}); } catch (e) {}
+      });
+    })(v, cam);
+
+    return cell;
+  }
+
+  // Simple fetch of cameras, then build grid using orderedCameraIds
+  (async function () {
+    var payload = null;
+    try {
+      var r = await fetch(nvDefault, { cache:'no-store', mode:'cors' });
+      if (r && r.ok) payload = await r.json();
+    } catch (e) { /* ignore */ }
+
+    // normalize to array of items
+    var arr = null;
+    if (Array.isArray(payload)) arr = payload;
+    else if (payload && Array.isArray(payload.data)) arr = payload.data;
+    else if (payload && Array.isArray(payload.rows)) arr = payload.rows;
+
+    // build a simple map id->item for quick lookups
+    var byId = {};
+    if (Array.isArray(arr)) {
+      arr.forEach(function (it) { if (it && it.id != null) byId[it.id] = it; });
+    }
+
+    // If fetch failed or items missing, attempt to read from parent page's camera-json element
+    if (!Object.keys(byId).length) {
+      try {
+        var el = window.opener ? window.opener.document.getElementById('camera-json') : document.getElementById('camera-json');
+        if (el) {
+          var txt = el.textContent || el.innerText || '';
+          if (txt) {
+            try {
+              var parsed = JSON.parse(txt);
+              var src = Array.isArray(parsed) ? parsed : (parsed && parsed.data) || null;
+              if (Array.isArray(src)) src.forEach(function (it) { if (it && it.id != null) byId[it.id] = it; });
+            } catch (e) {}
+          }
+        }
+      } catch (e) {}
+    }
+
+    // Build the grid — use orderedCameraIds array and create placeholder cells for missing items
+    orderedCameraIds.forEach(function (id) {
+      var item = byId[id] || { id: id, title: 'Camera ' + id, videoUrl: null };
+      // try to extract video URL field from common payload shapes
+      if (!item.videoUrl) {
+        try {
+          if (item.images && item.images.length && item.images[0].videoUrl) item.videoUrl = item.images[0].videoUrl;
+          else if (item.videoUrl) item.videoUrl = item.videoUrl;
+        } catch (e) {}
+      }
+      var c = makeCell({ id: id, title: item.location || item.roadway || item.title || ('Camera ' + id), videoUrl: item.videoUrl });
+      grid.appendChild(c);
+    });
+
+    // if no streams available, show a message
+    if (grid.children.length === 0) {
+      var p = document.createElement('div'); p.textContent = 'No camera data available.'; document.body.appendChild(p);
+    }
+  })();
+})();

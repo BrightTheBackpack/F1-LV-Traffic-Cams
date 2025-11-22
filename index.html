@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Vegas GP — Interactive Satellite Map & Standings</title>
+
+    <!-- External CSS (create later) -->
+    <link rel="stylesheet" href="main.css">
+
+    <!-- Leaflet CSS (used for the map; main.js will initialize Leaflet) -->
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha512-sA+q9j0mQxQp3lR6QhG8m4bVf9w1q9X3xO+u9qK5gk8QX4w0zL6z0r2tD8J5xG3r4m5a6b7c8d9e0f1g2h3i=="
+        crossorigin=""
+    />
+
+    <!-- Leaflet JS (linked here so developers can use it from main.js) -->
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha512-XQoYMqMTK8LvdlxK/8e8u8kUQ6gK1P5tJ5m2u3v4w5y6z7a8b9c0d1e2f3g4h5i6j7k8l9m0n1o2p3q4r5s6t=="
+        crossorigin=""
+        defer
+    ></script>
+
+    <!-- Application JS (create later). main.js should initialize the map, load the track, and fetch standings -->
+    <script src="main.js" defer></script>
+
+    <style>
+        /* Minimal inline layout so the HTML file displays sensibly until main.css is created */
+        html,body { height:100%; margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+        #map { position: absolute; top:0; right:0; bottom:0; left:0; }
+        #standings {
+            position: absolute;
+            right: 12px;
+            top: 12px;
+            max-width: 320px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 8px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+            padding: 10px;
+            font-size: 14px;
+            z-index: 1000;
+            overflow: auto;
+            max-height: 60vh;
+        }
+        #standings h2 { margin: 0 0 8px 0; font-size: 16px; }
+        #standings ul { margin:0; padding:0 0 0 20px; }
+        #overlay-toggle {
+            position: absolute;
+            right: 12px;
+            top: calc(12px + 60px);
+            z-index: 1001;
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            border: 0;
+            padding: 6px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        /* Small legend for the track */
+        .legend {
+            position: absolute;
+            left: 12px;
+            top: 12px;
+            z-index: 1000;
+            background: rgba(255,255,255,0.9);
+            padding: 6px 8px;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+
+    <header class="sr-only" aria-hidden="true">
+        <h1>Las Vegas Grand Prix — Map and Live Standings</h1>
+    </header>
+
+    <!-- Map container -->
+    <div id="map" role="region" aria-label="Las Vegas Grand Prix map (satellite view)" data-camera-endpoint="https://wispy-flower-cdf3.100brightli.workers.dev/?url=https://www.nvroads.com/List/GetData/Cameras?query=%7B%22columns%22%3A%5B%7B%22data%22%3Anull%2C%22name%22%3A%22%22%7D%2C%7B%22name%22%3A%22sortOrder%22%2C%22s%22%3Atrue%7D%2C%7B%22name%22%3A%22region%22%2C%22s%22%3Atrue%7D%2C%7B%22name%22%3A%22roadway%22%2C%22s%22%3Atrue%7D%2C%7B%22data%22%3A4%2C%22name%22%3A%22%22%7D%5D%2C%22order%22%3A%5B%7B%22column%22%3A1%2C%22dir%22%3A%22asc%22%7D%2C%7B%22column%22%3A2%2C%22dir%22%3A%22asc%22%7D%2C%7B%22column%22%3A3%2C%22dir%22%3A%22asc%22%7D%5D%2C%22start%22%3A0%2C%22length%22%3A17%2C%22search%22%3A%7B%22value%22%3A%22f1%22%7D%7D&lang=en-US">
+        <!-- Leaflet will inject tiles and layers here in main.js -->
+    </div>
+
+    <!-- Overlay / popup for current standings (main.js should populate this by fetching https://api.openf1.org/v1/position?session_key=latest) -->
+    <!-- <aside id="standings" role="complementary" aria-live="polite">
+        <h2>Current Standings</h2>
+        <div id="standings-content">
+            <p>Loading latest standings…</p>
+        </div>
+    </aside> -->
+
+    <!-- Toggle button to collapse standings if desired -->
+    <!-- <button id="overlay-toggle" aria-controls="standings" aria-expanded="true">Hide Standings</button> -->
+
+    <!-- Inline GeoJSON data for the track outline. Replace coordinates with an accurate track LineString or Polygon later.
+             GeoJSON uses [longitude, latitude]. main.js should read this element and add it as a vector layer.
+    -->
+    <script id="track-geojson" type="application/json">
+{
+"type": "FeatureCollection",
+"name": "us-2023",
+"bbox": [ -115.173181, 36.107928, -115.160107, 36.125540 ],                                                                        
+"features": [
+{ "type": "Feature", "properties": { "id": "us-2023", "Location": "Las Vegas", "Name": "Las Vegas Street Circuit", "opened": 2023, "firstgp": 2023, "length": 6201, "altitude": 610 }, "bbox": [ -115.173181, 36.107928, -115.160107, 36.12554 ], "geometry": { "type": "LineString", "coordinates": [ [ -115.161202, 36.109904 ], [ -115.160589, 36.110461 ], [ -115.160459, 36.110578 ], [ -115.160366, 36.110705 ], [ -115.160335, 36.110856 ], [ -115.160414, 36.110992 ], [ -115.160543, 36.111079 ], [ -115.160775, 36.11115 ], [ -115.160996, 36.111179 ], [ -115.161209, 36.111169 ], [ -115.161408, 36.111121 ], [ -115.161844, 36.110909 ], [ -115.162247, 36.110586 ], [ -115.162402, 36.110503 ], [ -115.162741, 36.110442 ], [ -115.162924, 36.110445 ], [ -115.163255, 36.110535 ], [ -115.163438, 36.110617 ], [ -115.163608, 36.110734 ], [ -115.16389, 36.111042 ], [ -115.164004, 36.111303 ], [ -115.164082, 36.119035 ], [ -115.164023, 36.119152 ], [ -115.163908, 36.119211 ], [ -115.161934, 36.119181 ], [ -115.161342, 36.119184 ], [ -115.161033, 36.119242 ], [ -115.160908, 36.119329 ], [ -115.160559, 36.119604 ], [ -115.160402, 36.119783 ], [ -115.160282, 36.119976 ], [ -115.160195, 36.120145 ], [ -115.160143, 36.120365 ], [ -115.160107, 36.120627 ], [ -115.160117, 36.120781 ], [ -115.160225, 36.120836 ], [ -115.160511, 36.120862 ], [ -115.160611, 36.120913 ], [ -115.160697, 36.12102 ], [ -115.160731, 36.121187 ], [ -115.160715, 36.121309 ], [ -115.160438, 36.121696 ], [ -115.16039, 36.121799 ], [ -115.160274, 36.121977 ], [ -115.160316, 36.122164 ], [ -115.160541, 36.122284 ], [ -115.160959, 36.122322 ], [ -115.164089, 36.122386 ], [ -115.165245, 36.122522 ], [ -115.165627, 36.122671 ], [ -115.166049, 36.123022 ], [ -115.166411, 36.123607 ], [ -115.166965, 36.124659 ], [ -115.167321, 36.124962 ], [ -115.16769, 36.125167 ], [ -115.168065, 36.125279 ], [ -115.168652, 36.125432 ], [ -115.169318, 36.12554 ], [ -115.169409, 36.125522 ], [ -115.169496, 36.125468 ], [ -115.169564, 36.125284 ], [ -115.169633, 36.125158 ], [ -115.170324, 36.124067 ], [ -115.170754, 36.123418 ], [ -115.170978, 36.123089 ], [ -115.171208, 36.122772 ], [ -115.171605, 36.122215 ], [ -115.172013, 36.121466 ], [ -115.172229, 36.1209 ], [ -115.172466, 36.120249 ], [ -115.172625, 36.119783 ], [ -115.172744, 36.119319 ], [ -115.172839, 36.118849 ], [ -115.17294, 36.11816 ], [ -115.172965, 36.117758 ], [ -115.172991, 36.117279 ], [ -115.17298, 36.115982 ], [ -115.172974, 36.115241 ], [ -115.172971, 36.114679 ], [ -115.173104, 36.111742 ], [ -115.173144, 36.110235 ], [ -115.173145, 36.109483 ], [ -115.173181, 36.108577 ], [ -115.173118, 36.108504 ], [ -115.173032, 36.10848 ], [ -115.172826, 36.108483 ], [ -115.172674, 36.108436 ], [ -115.172332, 36.108159 ], [ -115.172033, 36.108021 ], [ -115.171635, 36.107958 ], [ -115.169902, 36.107928 ], [ -115.167635, 36.10795 ], [ -115.16577, 36.107941 ], [ -115.164859, 36.107951 ], [ -115.164113, 36.108035 ], [ -115.163333, 36.108155 ], [ -115.16313, 36.10823 ], [ -115.162966, 36.108313 ], [ -115.162835, 36.108413 ], [ -115.161202, 36.109904 ] ] } }
+]
+}
+    </script>
+
+    <!-- Helpful data attributes for main.js:
+             - data-api-endpoint: where to fetch standings
+             - data-map-center: default map center (lat,lon)
+             - data-map-maxbounds: bounding box to restrict pan in format: southWestLat,southWestLon,northEastLat,northEastLon
+             main.js can read document.getElementById('map').dataset to obtain these.
+    -->
+    <script>
+        // Non-blocking dataset configuration for main.js to read.
+        (function attachConfig() {
+            var mapEl = document.getElementById('map');
+            // Center roughly on the Las Vegas Strip; adjust if needed.
+            mapEl.dataset.mapCenter = "36.3, -115.160";
+            // Restrict panning to a small area around the circuit (southWestLat, southWestLon, northEastLat, northEastLon)
+            mapEl.dataset.mapMaxbounds = "36.105928,-115.173181,36.135540,-115.160107";
+            mapEl.dataset.apiEndpoint = "https://api.openf1.org/v1/position?session_key=latest";
+            // Map tile attribution hint (main.js can use an Esri World Imagery / other satellite tiles)
+            mapEl.dataset.tileAttribution = "Esri World Imagery";
+        })();
+    </script>
+
+</body>
+</html>
