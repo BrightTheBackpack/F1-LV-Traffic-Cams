@@ -986,7 +986,7 @@
     }
 
         // The ordered camera list the user requested
-        var orderedCameraIds = [3429,3498,3416,3415,3414,3413,3882,3909,3410,3412,3411,4036];
+        var orderedCameraIds = [3498,3416,3415,3414,3413,3882,3909,3410,3412,3411,4036,4029];
 
         function ensureFsOverlay() {
             if (fsOverlay) return;

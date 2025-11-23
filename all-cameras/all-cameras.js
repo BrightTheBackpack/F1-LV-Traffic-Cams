@@ -25,7 +25,7 @@
   // show initial load message once on page open
   try { if (document.readyState === 'complete' || document.readyState === 'interactive') { showToast('Due to high demand, camera data may take a few minutes to initially load', 11000); } else { window.addEventListener('DOMContentLoaded', function () { showToast('Due to high demand, camera data may take a few minutes to initially load', 11000); }); } } catch (e) {}
   // Ordered camera IDs copied from main app
-  var orderedCameraIds = [3429,3498,3416,3415,3414,3413,3882,3909,3410,3412,3411,4036];
+  var orderedCameraIds = [3498,3416,3415,3414,3413,3882,3909,3410,3412,3411,4036,4029];
 
   // NV Roads endpoint proxied through the provided workers.dev proxy to bypass CORS
   var nvDefault = 'https://wispy-flower-cdf3.100brightli.workers.dev/?url=https://www.nvroads.com/List/GetData/Cameras?query=%7B%22columns%22%3A%5B%7B%22data%22%3Anull%2C%22name%22%3A%22%22%7D%2C%7B%22name%22%3A%22sortOrder%22%2C%22s%22%3Atrue%7D%2C%7B%22name%22%3A%22region%22%2C%22s%22%3Atrue%7D%2C%7B%22name%22%3A%22roadway%22%2C%22s%22%3Atrue%7D%2C%7B%22data%22%3A4%2C%22name%22%3A%22%22%7D%5D%2C%22order%22%3A%5B%7B%22column%22%3A1%2C%22dir%22%3A%22asc%22%7D%2C%7B%22column%22%3A2%2C%22dir%22%3A%22asc%22%7D%2C%7B%22column%22%3A3%2C%22dir%22%3A%22asc%22%7D%5D%2C%22start%22%3A0%2C%22length%22%3A17%2C%22search%22%3A%7B%22value%22%3A%22f1%22%7D%7D&lang=en-US';
