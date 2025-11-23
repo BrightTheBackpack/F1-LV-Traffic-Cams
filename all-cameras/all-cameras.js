@@ -151,25 +151,58 @@
                     try {
                       console.warn('HLS error', data);
                       // Only react to fatal errors; debounce showing the UI in case recovery succeeds
-                      if (data && data.fatal) {
-                        // clear previous timer if any
-                        try { if (videoEl._errorTimer) { clearTimeout(videoEl._errorTimer); videoEl._errorTimer = null; } } catch (e) {}
-                        // attempt automatic recovery for common errors
-                        try {
-                          if (data.type === 'mediaError' && typeof h.recoverMediaError === 'function') {
-                            h.recoverMediaError();
-                          } else if (data.type === 'networkError') {
-                            // try to reload fragments
-                            h.startLoad && h.startLoad();
-                          }
-                        } catch (e) {}
-                        // show status only if error persists after 2s
-                        videoEl._errorTimer = setTimeout(function () {
-                          try { setStatus('Stream error'); } catch (e) {}
-                          videoEl._errorTimer = null;
-                        }, 2000);
+                      if (!data) return;
+                      // clear previous debounce timer
+                      try { if (videoEl._errorTimer) { clearTimeout(videoEl._errorTimer); videoEl._errorTimer = null; } } catch (e) {}
+
+                      // initialize retry counter
+                      videoEl._hlsRetries = videoEl._hlsRetries || 0;
+
+                      if (data.fatal) {
+                        // Try best-effort recoveries depending on type
+                        if (data.type === 'mediaError' && typeof h.recoverMediaError === 'function') {
+                          try { h.recoverMediaError(); } catch (e) { console.warn('recoverMediaError failed', e); }
+                        } else if (data.type === 'networkError') {
+                          try { h.startLoad && h.startLoad(); } catch (e) { console.warn('startLoad failed', e); }
+                        } else {
+                          // generic attempt: restart loading
+                          try { h.startLoad && h.startLoad(); } catch (e) { }
+                        }
+
+                        // show a transient 'attempting recovery' status and increment retry counter
+                        videoEl._hlsRetries++;
+                        var attempt = videoEl._hlsRetries;
+                        setStatus('Attempting recovery (' + attempt + '/3)…');
+
+                        // If we've retried a few times and still failing, recreate the Hls instance as a last resort
+                        if (attempt >= 3) {
+                          // give a moment for any recover to happen, then replace
+                          setTimeout(function () {
+                            try {
+                              // destroy current instance
+                              h.destroy && h.destroy();
+                            } catch (e) {}
+                            try {
+                              // fallback to native src then re-create Hls after short delay
+                              videoEl.src = url;
+                              videoEl.load();
+                              videoEl.play().catch(function () {});
+                            } catch (e) {}
+                            // final UI state
+                            setStatus('Stream unavailable');
+                          }, 1200);
+                        } else {
+                          // schedule a follow-up: if still failing after 2s show 'Stream error'
+                          videoEl._errorTimer = setTimeout(function () {
+                            try { setStatus('Stream error'); } catch (e) {}
+                            videoEl._errorTimer = null;
+                          }, 2000);
+                        }
+                      } else {
+                        // non-fatal: show a warning briefly
+                        videoEl._errorTimer = setTimeout(function () { try { setStatus('Stream hiccup'); } catch (e) {} videoEl._errorTimer = null; }, 800);
                       }
-                    } catch (e) {}
+                    } catch (e) { console.warn('HLS error handler failed', e); }
                   });
                   // When fragments buffer, clear any pending error indicator
                   h.on && h.on(Hls.Events.FRAG_BUFFERED, function () { try { if (videoEl._errorTimer) { clearTimeout(videoEl._errorTimer); videoEl._errorTimer = null; } setStatus(''); } catch (e) {} });

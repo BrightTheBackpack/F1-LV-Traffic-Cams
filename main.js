@@ -344,6 +344,29 @@
                                                     hlsInstance = new Hls({ enableWorker: true, lowLatencyMode: true, liveSyncDurationCount: 3, maxBufferLength: 30 });
                                                     hlsInstance.loadSource(videoUrl);
                                                     hlsInstance.attachMedia(videoEl);
+                                                    // attach a resilient error handler: attempt recoverMediaError/startLoad and recreate after retries
+                                                    try {
+                                                        hlsInstance.on && hlsInstance.on(Hls.Events.ERROR, function (ev, data) {
+                                                            try {
+                                                                console.warn('Popup HLS error', data);
+                                                                videoEl._hlsRetries = (videoEl._hlsRetries || 0) + 1;
+                                                                // attempt immediate recoveries
+                                                                try {
+                                                                    if (data && data.type === 'mediaError' && typeof hlsInstance.recoverMediaError === 'function') {
+                                                                        hlsInstance.recoverMediaError();
+                                                                    } else if (data && data.type === 'networkError') {
+                                                                        hlsInstance.startLoad && hlsInstance.startLoad();
+                                                                    }
+                                                                } catch (e) { console.warn('recover attempt failed', e); }
+
+                                                                // If too many retries, destroy and fallback to native src
+                                                                if (videoEl._hlsRetries >= 3) {
+                                                                    try { hlsInstance.destroy && hlsInstance.destroy(); } catch (e) {}
+                                                                    try { videoEl.src = videoUrl; videoEl.load(); videoEl.play().catch(function(){}); } catch (e) {}
+                                                                }
+                                                            } catch (e) { console.warn('error handler failed', e); }
+                                                        });
+                                                    } catch (e) {}
                                                     // attach fragment listeners to capture program-date-time when present
                                                     try {
                                                         hlsInstance.on && hlsInstance.on(Hls.Events.FRAG_CHANGED, function (ev, data) {
@@ -886,6 +909,17 @@
                                 var h = new Hls({ enableWorker: true, lowLatencyMode: true, liveSyncDurationCount: 3, maxBufferLength: 30 });
                                 h.loadSource(url);
                                 h.attachMedia(hv);
+                                try {
+                                    h.on && h.on(Hls.Events.ERROR, function (ev, data) {
+                                        try {
+                                            console.warn('Prewarm HLS error', data);
+                                            // attempt a quick reload for network errors
+                                            if (data && data.type === 'networkError') {
+                                                try { h.startLoad && h.startLoad(); } catch (e) {}
+                                            }
+                                        } catch (e) {}
+                                    });
+                                } catch (e) {}
                                 // start playback to prompt buffering
                                 hv.play().catch(function () {});
                                 pool.hls = h;
@@ -1083,6 +1117,23 @@
                                 fsHlsInstance = new Hls({ enableWorker: true, lowLatencyMode: true, liveSyncDurationCount: 3, maxBufferLength: 30 });
                                 fsHlsInstance.loadSource(playUrl);
                                 fsHlsInstance.attachMedia(fsVideoEl);
+                                try {
+                                    fsHlsInstance.on && fsHlsInstance.on(Hls.Events.ERROR, function (ev, data) {
+                                        try {
+                                            console.warn('Fullscreen HLS error', data);
+                                            fsVideoEl._hlsRetries = (fsVideoEl._hlsRetries || 0) + 1;
+                                            if (data && data.type === 'mediaError' && typeof fsHlsInstance.recoverMediaError === 'function') {
+                                                try { fsHlsInstance.recoverMediaError(); } catch (e) { }
+                                            } else if (data && data.type === 'networkError') {
+                                                try { fsHlsInstance.startLoad && fsHlsInstance.startLoad(); } catch (e) { }
+                                            }
+                                            if (fsVideoEl._hlsRetries >= 3) {
+                                                try { fsHlsInstance.destroy && fsHlsInstance.destroy(); } catch (e) {}
+                                                try { fsVideoEl.src = playUrl; fsVideoEl.load(); fsVideoEl.play().catch(function(){}); } catch (e) {}
+                                            }
+                                        } catch (e) {}
+                                    });
+                                } catch (e) {}
                                 fsVideoEl.play().catch(function () {});
                             } else {
                                 fsVideoEl.src = playUrl;
