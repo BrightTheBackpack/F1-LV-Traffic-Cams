@@ -1,7 +1,35 @@
 // main.js — initialize map, load track GeoJSON, fetch standings, and wire UI
-//if u couldn't tell i vibecoded like 80% of this in like 1-3 hour
+// small non-blocking toast helper replaces modal alert() so the page doesn't pause
 (function () {
     'use strict';
+
+    // Minimal toast notification helper (non-blocking)
+    function _injectToastStyles() {
+        if (document.getElementById('site-toast-styles')) return;
+        var s = document.createElement('style');
+        s.id = 'site-toast-styles';
+    s.textContent = '\n.site-toast{position:fixed;right:20px;bottom:20px;background:linear-gradient(180deg, rgba(0,0,0,0.92), rgba(0,0,0,0.86));color:#fff;padding:10px 14px;border-radius:8px;font-size:15px;line-height:1.25;z-index:1000000;opacity:0;transform:translateY(10px);transition:opacity .22s,transform .22s;box-shadow:0 6px 20px rgba(0,0,0,0.35);max-width:420px;text-align:left}\n.site-toast.visible{opacity:1;transform:translateY(0)}\n';
+        document.head.appendChild(s);
+    }
+
+    function showToast(msg, ms) {
+        try {
+            _injectToastStyles();
+            ms = typeof ms === 'number' ? ms : 4500;
+            var t = document.createElement('div');
+            t.className = 'site-toast';
+            t.textContent = String(msg || '');
+            document.body.appendChild(t);
+            // allow CSS to apply
+            requestAnimationFrame(function () { t.classList.add('visible'); });
+            setTimeout(function () { t.classList.remove('visible'); }, ms - 300);
+            setTimeout(function () { try { t.remove(); } catch (e) {} }, ms);
+            return t;
+        } catch (e) { try { console.warn('showToast failed', e); } catch (er) {} }
+    }
+
+    // Show the initial non-blocking notice once on page load
+    try { if (document.readyState === 'complete' || document.readyState === 'interactive') { showToast('Due to high demand, camera data may take a few minutes to initially load', 11000); } else { window.addEventListener('DOMContentLoaded', function () { showToast('Due to high demand, camera data may take a few minutes to initially load', 11000); }); } } catch (e) {}
 
     // Utility: safe parse floats
     function toFloat(n, fallback) {
@@ -623,13 +651,13 @@
 
                                 submit.onclick = function () {
                                     var txt = ta.value;
-                                    if (!txt || !txt.trim()) { alert('Please paste JSON containing the missing camera objects.'); return; }
+                                    if (!txt || !txt.trim()) { showToast('Please paste JSON containing the missing camera objects.', 5000); return; }
                                     try {
                                         var parsed = JSON.parse(txt);
                                         var newArr = null;
                                         if (Array.isArray(parsed)) newArr = parsed;
                                         else if (parsed && Array.isArray(parsed.data)) newArr = parsed.data;
-                                        if (!newArr) { alert('Could not find an array in the pasted JSON. Paste the inner data array or the full payload.'); return; }
+                                        if (!newArr) { showToast('Could not find an array in the pasted JSON. Paste the inner data array or the full payload.', 6000); return; }
 
                                         // Read existing embedded payload if available so we can merge uniquely by id
                                         var camJsonEl = document.getElementById('camera-json');
@@ -665,7 +693,7 @@
                                         // Close overlay
                                         try { document.body.removeChild(overlay); } catch (e) { }
                                     } catch (e) {
-                                        alert('Failed to parse JSON: ' + (e && e.message ? e.message : String(e)));
+                                        showToast('Failed to parse JSON: ' + (e && e.message ? e.message : String(e)), 7000);
                                     }
                                 };
                             };

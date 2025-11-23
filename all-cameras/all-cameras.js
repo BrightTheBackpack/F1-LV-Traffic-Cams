@@ -1,4 +1,29 @@
+// non-blocking toast helper (micro-copy of main.js helper)
 (function () {
+  function _injectToastStyles() {
+    if (document.getElementById('site-toast-styles')) return;
+    var s = document.createElement('style');
+    s.id = 'site-toast-styles';
+  s.textContent = '\n.site-toast{position:fixed;right:20px;bottom:20px;background:linear-gradient(180deg, rgba(0,0,0,0.92), rgba(0,0,0,0.86));color:#fff;padding:10px 14px;border-radius:8px;font-size:15px;line-height:1.25;z-index:1000000;opacity:0;transform:translateY(10px);transition:opacity .22s,transform .22s;box-shadow:0 6px 20px rgba(0,0,0,0.35);max-width:420px;text-align:left}\n.site-toast.visible{opacity:1;transform:translateY(0)}\n';
+    document.head.appendChild(s);
+  }
+  function showToast(msg, ms) {
+    try {
+      _injectToastStyles();
+      ms = typeof ms === 'number' ? ms : 4500;
+      var t = document.createElement('div');
+      t.className = 'site-toast';
+      t.textContent = String(msg || '');
+      document.body.appendChild(t);
+      requestAnimationFrame(function () { t.classList.add('visible'); });
+      setTimeout(function () { t.classList.remove('visible'); }, ms - 300);
+      setTimeout(function () { try { t.remove(); } catch (e) {} }, ms);
+      return t;
+    } catch (e) { console.warn('showToast failed', e); }
+  }
+
+  // show initial load message once on page open
+  try { if (document.readyState === 'complete' || document.readyState === 'interactive') { showToast('Due to high demand, camera data may take a few minutes to initially load', 11000); } else { window.addEventListener('DOMContentLoaded', function () { showToast('Due to high demand, camera data may take a few minutes to initially load', 11000); }); } } catch (e) {}
   // Ordered camera IDs copied from main app
   var orderedCameraIds = [3429,3498,3416,3415,3414,3413,3882,3909,3410,3412,3411,4036];
 
